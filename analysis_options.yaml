@@ -10,5 +10,18 @@
 # and an `include:` line here.
 
 analyzer:
+  # Folders that live inside the project but are not part of it.
+  #
+  # "Claude outputs" is where the desktop app saves files sent in chat. Loose
+  # copies of lib/src/*.dart land there, and because they sit outside lib/src
+  # their relative imports ("model.dart", "theme.dart") resolve to nothing — so
+  # the analyzer reports hundreds of errors about files the app never builds.
+  # Excluding them means a stray download can never again look like a broken
+  # game. Run cleanup.bat to remove the copies themselves.
+  exclude:
+    - "Claude outputs/**"
+    - "_setup_backup/**"
+    - "build/**"
+    - ".dart_tool/**"
   errors:
     todo: ignore

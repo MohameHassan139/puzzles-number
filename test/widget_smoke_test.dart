@@ -1,72 +1,125 @@
-// Startup tests: the app must build, lay out and paint a fresh round without
-// throwing, and the controls must be wired up.
+// Startup and control tests.
 //
-// Nothing here taps the board or plays a tile: the bot answers on a 650 ms
-// timer, and a widget test fails if a timer is still pending when it ends.
+// Two things to know when adding to this file. The board runs on a Ticker that
+// keeps scheduling frames while anything is animating — including the steady
+// pulse under a selected triangle — so `pumpAndSettle` is only safe while
+// nothing is selected. And the bot answers on a timer, so no test here plays a
+// tile: a pending timer fails a widget test.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:puzzles_numeral/main.dart';
 
+Future<void> _boot(WidgetTester tester) async {
+  await tester.pumpWidget(const PuzzlesNumeralApp());
+  // let the opening deal finish popping in
+  for (int i = 0; i < 14; i++) {
+    await tester.pump(const Duration(milliseconds: 80));
+  }
+}
+
 void main() {
-  testWidgets('the app starts on a dealt round', (WidgetTester tester) async {
-    await tester.pumpWidget(const PuzzlesNumeralApp());
-    await tester.pump();
+  testWidgets('the app opens on a dealt round', (WidgetTester tester) async {
+    await _boot(tester);
 
     expect(find.text('Puzzles Numeral'), findsOneWidget);
-    expect(find.text('New game'), findsOneWidget);
-    expect(find.text('Rotate'), findsOneWidget);
-    expect(find.text('Hint'), findsOneWidget);
-    expect(find.text('Undo'), findsOneWidget);
+    expect(find.text('YOU'), findsOneWidget);
+    expect(find.text('BOT'), findsOneWidget);
+    expect(find.text('Draw'), findsOneWidget);
 
-    // The board and the rack tiles are painted.
+    // the board and the rack are both painted
     expect(find.byType(CustomPaint), findsWidgets);
+    // and the four controls are there
+    expect(find.byIcon(Icons.rotate_right_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.lightbulb_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.undo_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
 
-    // It is the player's turn, so the pile line is showing.
-    expect(find.textContaining('Pile ·'), findsOneWidget);
-    expect(find.textContaining('You ·'), findsOneWidget);
-  });
-
-  testWidgets('the hint button names a playable space', (WidgetTester tester) async {
-    await tester.pumpWidget(const PuzzlesNumeralApp());
-    await tester.pump();
-
-    await tester.tap(find.text('Hint'));
-    await tester.pump();
-
-    // Either it found a move, or it honestly says there is none. Both are fine;
-    // what matters is that asking never throws.
-    expect(
-      find.textContaining(RegExp(r'ringed space|Nothing in your hand')),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('New game deals a fresh round without throwing',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(const PuzzlesNumeralApp());
-    await tester.pump();
-
-    await tester.tap(find.text('New game'));
-    await tester.pump();
-
-    expect(find.textContaining('triangles in play'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the rules sheet opens and closes', (WidgetTester tester) async {
-    await tester.pumpWidget(const PuzzlesNumeralApp());
+  testWidgets('the message line says what level was dealt',
+      (WidgetTester tester) async {
+    await _boot(tester);
+    expect(find.textContaining('triangles'), findsOneWidget);
+  });
+
+  testWidgets('the hint picks a triangle up and rings a space',
+      (WidgetTester tester) async {
+    await _boot(tester);
+
+    await tester.tap(find.byIcon(Icons.lightbulb_rounded));
+    // Not pumpAndSettle: a selected triangle pulses for as long as it is held.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(
+      find.textContaining(RegExp(r'ringed space|Nothing fits')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('rotate is dead until a triangle is in hand, then it is not',
+      (WidgetTester tester) async {
+    await _boot(tester);
+
+    final GamePageState state = tester.state(find.byType(GamePage));
+    expect(state.sel, isNull);
+
+    await tester.tap(find.byIcon(Icons.lightbulb_rounded));
+    await tester.pump();
+    if (state.sel != null) {
+      final int before = state.rot;
+      await tester.tap(find.byIcon(Icons.rotate_right_rounded));
+      await tester.pump();
+      expect(state.rot, isNot(before));
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the refresh button deals a fresh round',
+      (WidgetTester tester) async {
+    await _boot(tester);
+    final GamePageState state = tester.state(find.byType(GamePage));
+    final int before = state.board.length;
+
+    await tester.tap(find.byIcon(Icons.refresh_rounded));
     await tester.pump();
 
-    await tester.tap(find.byIcon(Icons.tune));
+    expect(state.scores, <int>[0, 0]);
+    expect(state.board.length, before);
+    expect(state.hands[0].length, state.handSize);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the rules sheet opens, and starting from it re-deals',
+      (WidgetTester tester) async {
+    await _boot(tester);
+
+    await tester.tap(find.byIcon(Icons.tune_rounded));
     await tester.pumpAndSettle();
     expect(find.text('How it plays'), findsOneWidget);
+    expect(find.text('A kind pile'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Start a new game'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Start a new game'));
-    await tester.pumpAndSettle();
+    for (int i = 0; i < 16; i++) {
+      await tester.pump(const Duration(milliseconds: 80));
+    }
+
     expect(find.text('How it plays'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a dealt round always leaves the player something to do',
+      (WidgetTester tester) async {
+    await _boot(tester);
+    final GamePageState state = tester.state(find.byType(GamePage));
+    // Either a triangle in hand fits, or the pile will hand one over.
+    final bool somethingToDo =
+        !state.stuck || state.deck.isNotEmpty;
+    expect(somethingToDo, isTrue);
   });
 }

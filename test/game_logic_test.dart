@@ -4,7 +4,6 @@
 // two bots always terminates without an illegal move.
 
 import 'dart:math';
-import 'dart:ui' show Offset;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:puzzles_numeral/main.dart';

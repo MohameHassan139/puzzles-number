@@ -1,30 +1,50 @@
-// This is a basic Flutter widget test.
+// `flutter create` drops a counter-app test in at this path, and it refers to a
+// class called MyApp that this project does not have — which is where the
+// `The name 'MyApp' isn't a class` error came from.
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// Rather than leave an empty file where the template will keep landing, this
+// checks the things nothing else does: that the one public import really does
+// expose the whole game, and that the tuning tables are internally consistent.
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:puzzles_numeral/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  test('one import exposes the whole game', () {
+    // Model, scoring, deck, ai, theme, effects, painters, widgets, page.
+    expect(const TCorner(2, 4).isJoker, isFalse);
+    expect(kTouchPoints.length, 4);
+    expect(deckPlan(Level.normal, 7, 5).total, greaterThan(0));
+    expect(makeDeck(seed: 1, jokers: 2, regulars: 20).length, 22);
+    expect(botLevelShort(BotLevel.hard), isNotEmpty);
+    expect(kCandies.length, kColors.length);
+    expect(popScale(1), 1);
+    expect(const PuzzlesNumeralApp(), isNotNull);
+    expect(const GamePage(), isNotNull);
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  test('the level table is internally consistent', () {
+    for (final Level level in Level.values) {
+      final LevelPlan plan = kLevels[level]!;
+      expect(plan.minTiles, lessThanOrEqualTo(plan.maxTiles));
+      expect(plan.jokerShare, inInclusiveRange(0.0, 1.0));
+      expect(plan.short, isNotEmpty);
+      expect(kRoots[plan.root], isNotNull);
+      // Every level must deal enough to fill both hands with room to spare.
+      for (int handSize = 3; handSize <= 9; handSize++) {
+        final DeckPlan deal = deckPlan(level, 7, handSize);
+        expect(deal.total, greaterThanOrEqualTo(handSize * 2 + 8));
+        expect(deal.regulars + deal.jokers, deal.total);
+        expect(deal.regulars, greaterThan(0));
+      }
+    }
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  test('the scoring table cannot pay for a placement that touches nothing', () {
+    expect(kTouchPoints[0], 0);
+    for (int i = 1; i < kTouchPoints.length; i++) {
+      expect(kTouchPoints[i], greaterThan(kTouchPoints[i - 1]));
+    }
+    expect(kCircleBonus, greaterThan(kTouchPoints.last - kTouchPoints[2]));
   });
 }

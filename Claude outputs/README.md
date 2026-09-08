@@ -131,37 +131,6 @@ queries, so the speed is not bought with a behaviour change.
 
 ---
 
-## If `flutter analyze` reports hundreds of errors
-
-Check *where* the errors are before believing them. Almost certainly they are
-not in `lib/src`.
-
-**`Claude outputs\`** — the desktop app saves files sent in chat into a folder
-of that name inside the project. Loose copies of `ai.dart`, `game_page.dart`
-and friends end up there, and because they are not in `lib/src` their relative
-imports (`model.dart`, `theme.dart`) resolve to nothing. The analyzer then
-reports several hundred errors about files the app never builds — every one of
-them a duplicate of a file that is fine where it actually lives.
-
-**`_setup_backup\`** — left behind if `setup.bat` was interrupted. It holds an
-old copy of the source, which gets analysed too.
-
-**`test\widget_test.dart`** — `flutter create` writes a counter-app test there
-that refers to a class called `MyApp`, which this project does not have.
-
-All three are handled now: `analysis_options.yaml` excludes the first two,
-`test/widget_test.dart` has been replaced with a real test, and `setup.bat`
-restores the whole `lib` and `test` folders over the template rather than just
-`lib/main.dart`. **Run `cleanup.bat` once** to delete the duplicate files that
-are already there.
-
-One more thing worth knowing: `flutter create` can exit non-zero purely because
-Flutter's own version check (`git fetch --tags`) could not reach github. The
-project is still created. `setup.bat` no longer treats that exit code as fatal —
-it checks whether the files actually landed instead.
-
----
-
 ## Layout
 
 ```
@@ -178,7 +147,6 @@ lib/src/game_page.dart      the screen and the turn it drives
 test/                       three suites, described below
 pubspec.yaml                no third-party packages at all
 setup.bat / setup.sh        one-shot project generation
-cleanup.bat                 removes stray duplicates that break the analyzer
 ```
 
 Everything the game needs ships with the Flutter SDK, so `flutter pub get`
