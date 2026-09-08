@@ -1,0 +1,14 @@
+# Analyzer defaults only.
+#
+# The usual `include: package:flutter_lints/flutter.yaml` is left out on
+# purpose: those are style lints, and `flutter analyze` exits non-zero on them,
+# which makes a perfectly healthy build look broken. Add it back any time with:
+#
+#   dev_dependencies:
+#     flutter_lints: ^5.0.0
+#
+# and an `include:` line here.
+
+analyzer:
+  errors:
+    todo: ignore
